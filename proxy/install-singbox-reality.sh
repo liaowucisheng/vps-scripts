@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # ============================================================
 # Sing-box + REALITY 一键安装脚本 (香港优化版)
@@ -38,9 +39,8 @@ SING_BOX_VERSION="1.11.6"
 # ---------- 1. 系统准备 ----------
 info "更新系统..."
 apt update -y && apt upgrade -y
-apt install curl wget unzip openssl -y
+apt install curl wget unzip openssl ntp -y
 timedatectl set-timezone Asia/Hong_Kong
-apt install ntp -y
 systemctl enable ntp --now 2>/dev/null || true
 
 # ---------- 2. 开启 BBR ----------

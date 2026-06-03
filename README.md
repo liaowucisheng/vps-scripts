@@ -2,7 +2,7 @@
 
 > 服务器常用安装脚本集合 — 一键部署，开箱即用。
 
-适用于 Ubuntu 20.04+ / Debian 10+，专注香港 VPS 场景。
+适用于 Ubuntu 20.04+ / Debian 10+ / CentOS 7+，专注 VPS 快速初始化。
 
 [![GitHub](https://img.shields.io/badge/GitHub-liaowucisheng/vps--scripts-blue?style=flat-square)](https://github.com/liaowucisheng/vps-scripts)
 
@@ -11,6 +11,7 @@
 ## 目录
 
 - [代理搭建](#proxy)
+- [Docker 安装](#docker)
 - [快速使用](#quickstart)
 - [分享给朋友](#share)
 - [贡献指南](#contributing)
@@ -29,6 +30,50 @@
 
 - **Xray** — REALITY 协议的发明者，生态最成熟
 - **Sing-box** — 内核更现代，自带 DNS 防污染，支持 TUN 模式
+
+---
+
+<a name="docker"></a>
+## 🐳 Docker 安装
+
+| 脚本 | 内容 | 特点 |
+|------|------|------|
+| [install-docker.sh](docker/install-docker.sh) | Docker + Compose（插件 + 独立命令） | 自动检测云厂商，海外直连 / 国内镜像加速 |
+
+### 功能特性
+
+- **云厂商自动检测** — 识别阿里云 / 腾讯云 / 华为云 / AWS / Azure / GCP，自动推荐对应镜像加速器
+- **地域感知** — 阿里云海外地域直接拉取 Docker Hub，国内地域推荐阿里云加速器
+- **日志限制** — 自动配置单容器日志最大 10MB、保留 3 个文件，防止日志撑爆磁盘
+- **非 root 使用** — 自动找到 sudo 用户加入 `docker` 组，无需每次 `sudo`
+- **BBR 加速** — 可选开启 TCP BBR 拥塞控制
+- **Docker Compose** — 同时安装 Compose 插件（`docker compose`）和独立命令（`docker-compose`）
+- **自检验证** — 安装完成后自动运行 hello-world 验证
+
+### 一键运行
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-docker.sh)"
+```
+
+### 运行流程
+
+1. 执行后根据云厂商自动调整默认选项：
+   - **阿里云海外地域** → 镜像加速默认关闭，直接回车即可
+   - **阿里云/腾讯云/华为云国内** → 推荐启用镜像加速
+   - **其他厂商/通用** → 按需选择
+
+2. 脚本自动完成：更新系统 → 开启 BBR → 安装 Docker → 配置镜像加速和日志限制 → 启动服务 → 添加 docker 组 → 安装 Compose → 自检验证
+
+3. 安装完成后终端会打印配置摘要和管理命令：
+
+   ```
+   ✅ Docker + Compose 安装完成！
+   📋 安装摘要
+   🛠 常用管理命令
+   ```
+
+> 💡 **存储建议：** 轻量应用服务器磁盘空间有限，建议定期清理无用镜像：`docker image prune -a`
 
 ---
 
@@ -137,6 +182,8 @@ vps-scripts/
 
 安装后常用操作：
 
+### 代理
+
 ```bash
 # 查看运行状态
 systemctl status xray        # Xray
@@ -151,6 +198,25 @@ systemctl restart xray
 systemctl restart sing-box
 ```
 
+### Docker
+
+```bash
+# 查看运行状态
+systemctl status docker
+
+# 查看日志
+journalctl -u docker --no-pager -l -n 30
+
+# 重启
+systemctl restart docker
+
+# 查看运行容器
+docker ps
+
+# 清理无用镜像
+docker image prune -a
+```
+
 ---
 
 <a name="contributing"></a>
@@ -159,7 +225,6 @@ systemctl restart sing-box
 欢迎提交 PR 或开 Issue 补充更多服务器脚本，比如：
 
 - 系统初始化（时区、SSH 加固、Fail2Ban）
-- Docker / Docker Compose 安装
 - Node.js / Python 环境部署
 - 网络加速（BBR、BBRx）
 - WireGuard VPN

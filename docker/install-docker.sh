@@ -12,7 +12,6 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 NC='\033[0m'
 
 info()      { echo -e "${GREEN}[INFO]${NC} $1"; }
@@ -115,11 +114,11 @@ echo ""
 MIRROR_DEFAULT="n"
 is_china_cloud "$CLOUD_PROVIDER" && MIRROR_DEFAULT="y"
 
-# 阿里云新加坡仍直连，但如果检测到阿里云，提示用户确认地域
+# 阿里云国内/海外地域分别处理
 if [[ "$CLOUD_PROVIDER" == "aliyun" ]]; then
     echo -e "${YELLOW}检测到阿里云服务器。${NC}"
-    echo -e "${YELLOW}如果服务器在海外（如新加坡），可直接拉取 Docker Hub 镜像，无需加速。${NC}"
     echo -e "${YELLOW}如果服务器在中国大陆，建议启用镜像加速。${NC}"
+    echo -e "${YELLOW}如果服务器在海外，可直接拉取 Docker Hub 镜像，无需加速。${NC}"
     echo ""
     read -p "服务器是否在中国大陆地域? (y/n, 默认 n): " IS_CHINA_REGION
     IS_CHINA_REGION=${IS_CHINA_REGION:-n}
