@@ -39,6 +39,7 @@
 | 脚本 | 内容 | 特点 |
 |------|------|------|
 | [install-docker.sh](docker/install-docker.sh) | Docker + Compose（插件 + 独立命令） | 自动检测云厂商，海外直连 / 国内镜像加速 |
+| [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx Docker 容器部署 | 回落站点 / 静态网站 / 反向代理 |
 
 ### 功能特性
 
@@ -50,7 +51,13 @@
 - **Docker Compose** — 同时安装 Compose 插件（`docker compose`）和独立命令（`docker-compose`）
 - **自检验证** — 安装完成后自动运行 hello-world 验证
 
-### 一键运行
+### Nginx 一键运行
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-nginx.sh)"
+```
+
+### 运行流程（install-docker.sh）
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-docker.sh)"
@@ -174,7 +181,8 @@ vps-scripts/
 │   └── install-singbox-reality.sh
 ├── system/                 ← 系统优化（开发中）
 ├── docker/                 ← Docker 安装
-│   └── install-docker.sh
+│   ├── install-docker.sh
+│   └── deploy-nginx.sh
 ```
 
 ---
