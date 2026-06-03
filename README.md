@@ -167,6 +167,7 @@ Clash Meta 配置：
 
 ```
 vps-scripts/
+├── .gitignore              ← Git 忽略规则
 ├── README.md               ← 本文件
 ├── proxy/                  ← 代理搭建
 │   ├── install-xray-reality.sh
