@@ -127,7 +127,8 @@ vps-scripts/
 │   ├── install-xray-reality.sh
 │   └── install-singbox-reality.sh
 ├── system/                 ← 系统优化（开发中）
-└── docker/                 ← Docker 安装（开发中）
+├── docker/                 ← Docker 安装
+│   └── install-docker.sh
 ```
 
 ---
