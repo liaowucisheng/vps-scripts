@@ -31,6 +31,8 @@
 - **Xray** — REALITY 协议的发明者，生态最成熟
 - **Sing-box** — 内核更现代，自带 DNS 防污染，支持 TUN 模式
 
+> 💡 也提供 [Docker 版代理脚本](#docker-代理)（容器隔离运行，方便管理升级）
+
 ---
 
 <a name="docker"></a>
@@ -40,6 +42,8 @@
 |------|------|------|
 | [install-docker.sh](docker/install-docker.sh) | Docker + Compose（插件 + 独立命令） | 自动检测云厂商，海外直连 / 国内镜像加速 |
 | [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx Docker 容器部署 | 回落站点 / 静态网站 / 反向代理 |
+| [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray + REALITY (Docker) | 容器隔离运行，`--network host` 性能无损耗 |
+| [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box + REALITY (Docker) | 容器隔离运行，自带 DNS over TLS |
 
 ### 功能特性
 
@@ -82,6 +86,30 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 
 > 💡 **存储建议：** 轻量应用服务器磁盘空间有限，建议定期清理无用镜像：`docker image prune -a`
 
+<a name="docker-代理"></a>
+### 代理搭建 (Docker 版)
+
+Docker 版代理脚本与 [原生安装](#proxy) 配置参数完全一致，区别只在于以容器方式运行：
+
+| 对比项 | 原生安装 | Docker 版 |
+|--------|----------|-----------|
+| 安装方式 | 下载二进制 + systemd 服务 | 拉取镜像 + Docker 容器 |
+| 卸载 | 删文件 + 删服务 | `docker rm -f` 一行搞定 |
+| 升级 | 重跑安装脚本 | `docker pull` + 重启 |
+| 性能 | 裸机 | `--network host` 无损耗 |
+
+**Xray Docker 版：**
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-xray-reality.sh)"
+```
+
+**Sing-box Docker 版：**
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-singbox-reality.sh)"
+```
+
 ---
 
 <a name="quickstart"></a>
@@ -102,6 +130,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/proxy/install-singbox-reality.sh)"
 ```
+
+> 也提供 [Docker 版](#docker-代理)，容器隔离运行，升级卸载更干净。
 
 ### 运行流程
 
@@ -180,9 +210,11 @@ vps-scripts/
 │   ├── install-xray-reality.sh
 │   └── install-singbox-reality.sh
 ├── system/                 ← 系统优化（开发中）
-├── docker/                 ← Docker 安装
+├── docker/                 ← Docker 安装 & 容器化部署
 │   ├── install-docker.sh
-│   └── deploy-nginx.sh
+│   ├── deploy-nginx.sh
+│   ├── install-xray-reality.sh
+│   └── install-singbox-reality.sh
 ```
 
 ---
