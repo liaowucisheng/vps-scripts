@@ -1,179 +1,237 @@
 # vps-scripts
 
-> 服务器常用安装脚本集合 — 一键部署，开箱即用。
+> 云服务器一键配置脚本合集 — 新服务器到手，按步骤直接跑。
 
-适用于 Ubuntu 20.04+ / Debian 10+ / CentOS 7+，专注 VPS 快速初始化。
+适用于 **Ubuntu 20.04+ / Debian 10+ / CentOS 7+**，轻量应用服务器（2 核 1G 等均可）。
 
 [![GitHub](https://img.shields.io/badge/GitHub-liaowucisheng/vps--scripts-blue?style=flat-square)](https://github.com/liaowucisheng/vps-scripts)
 
 ---
 
-## 目录
+## 📋 新服务器部署路线图
 
-- [代理搭建](#proxy)
-- [Docker 安装](#docker)
-- [快速使用](#quickstart)
-- [分享给朋友](#share)
-- [贡献指南](#contributing)
+刚买的 VPS → SSH 登录 → 按以下顺序执行：
 
----
-
-<a name="proxy"></a>
-## 📡 代理搭建
-
-| 脚本 | 内核 | 协议 | 特点 |
-|------|------|------|------|
-| [install-xray-reality.sh](proxy/install-xray-reality.sh) | Xray-core | VLESS + REALITY + Vision | 稳定成熟，配置简单 |
-| [install-singbox-reality.sh](proxy/install-singbox-reality.sh) | Sing-box | VLESS + REALITY + Vision | 原生 DNS over TLS，内核更精简 |
-
-两款脚本效果一样（客户端都是 v2rayN / Clash Meta 通用），区别只在于服务端内核：
-
-- **Xray** — REALITY 协议的发明者，生态最成熟
-- **Sing-box** — 内核更现代，自带 DNS 防污染，支持 TUN 模式
-
-> 💡 也提供 [Docker 版代理脚本](#docker-代理)（容器隔离运行，方便管理升级）
-
----
-
-<a name="docker"></a>
-## 🐳 Docker 安装
-
-| 脚本 | 内容 | 特点 |
-|------|------|------|
-| [install-docker.sh](docker/install-docker.sh) | Docker + Compose（插件 + 独立命令） | 自动检测云厂商，海外直连 / 国内镜像加速 |
-| [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx Docker 容器部署 | 回落站点 / 静态网站 / 反向代理 |
-| [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray + REALITY (Docker) | 容器隔离运行，`--network host` 性能无损耗 |
-| [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box + REALITY (Docker) | 容器隔离运行，自带 DNS over TLS |
-
-### 功能特性
-
-- **云厂商自动检测** — 识别阿里云 / 腾讯云 / 华为云 / AWS / Azure / GCP，自动推荐对应镜像加速器
-- **地域感知** — 阿里云海外地域直接拉取 Docker Hub，国内地域推荐阿里云加速器
-- **日志限制** — 自动配置单容器日志最大 10MB、保留 3 个文件，防止日志撑爆磁盘
-- **非 root 使用** — 自动找到 sudo 用户加入 `docker` 组，无需每次 `sudo`
-- **BBR 加速** — 可选开启 TCP BBR 拥塞控制
-- **Docker Compose** — 同时安装 Compose 插件（`docker compose`）和独立命令（`docker-compose`）
-- **自检验证** — 安装完成后自动运行 hello-world 验证
-
-### Nginx 一键运行
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-nginx.sh)"
+```
+ ① 系统初始化  ─── 更新、BBR、基础依赖
+ ② Docker 环境 ─── 容器引擎（所有服务的基础）
+ ③ 代理搭建    ─── Xray / Sing-box（按需）
+ ④ 开发环境    ─── code-server + AI（按需）
+ ⑤ Web 服务    ─── Nginx（按需）
 ```
 
-### 运行流程（install-docker.sh）
+每步都是一个独立脚本，只做一件事，可自由跳过或组合。
+
+---
+
+<a name="step-1"></a>
+## ① 系统初始化
+
+初次上手的必备操作：更新系统 + 开启 BBR + 安装基础工具。
+
+暂未提供独立脚本（开发中），可手动执行：
+
+```bash
+apt update -y && apt upgrade -y
+apt install curl wget openssl -y
+
+# 开启 BBR
+modprobe tcp_bbr
+echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
+echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+sysctl -p
+```
+
+> 💡 后续的 **install-docker.sh** 和代理脚本都会自动安装 curl/openssl 并启用 BBR，跳过本步不影响。
+
+---
+
+<a name="step-2"></a>
+## ② Docker 环境
+
+容器引擎是一切容器化服务的基础。**所有其他脚本都可以依赖 Docker 运行。**
+
+| 脚本 | 功能 | 特点 |
+|------|------|------|
+| [install-docker.sh](docker/install-docker.sh) | 安装 Docker + Compose | 自动检测云厂商、镜像加速、日志限制、非 root 使用、自检验证 |
+
+### 一键运行
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-docker.sh)"
 ```
 
-### 运行流程
+### 脚本特点
 
-1. 执行后根据云厂商自动调整默认选项：
-   - **阿里云海外地域** → 镜像加速默认关闭，直接回车即可
-   - **阿里云/腾讯云/华为云国内** → 推荐启用镜像加速
-   - **其他厂商/通用** → 按需选择
+- **云厂商自动感知** — 识别阿里云/腾讯云/华为云/AWS/Azure/GCP，智能推荐镜像加速
+- **地域感知** — 阿里云海外地域默认直连 Docker Hub，国内地域推荐加速器
+- **镜像加速菜单** — 支持阿里云专属加速器、Docker Proxy、中科大镜像
+- **日志限制** — 单容器日志最大 10MB，保留 3 个文件，防止磁盘写满
+- **非 root 使用** — 自动检测 sudo 用户并加入 `docker` 组
+- **Docker Compose** — 同时安装 Compose 插件（`docker compose`）和独立命令（`docker-compose`）
+- **BBR 加速** — 可选开启 TCP BBR 拥塞控制
+- **自检验证** — 安装后自动 `docker run hello-world` 验证
 
-2. 脚本自动完成：更新系统 → 开启 BBR → 安装 Docker → 配置镜像加速和日志限制 → 启动服务 → 添加 docker 组 → 安装 Compose → 自检验证
+> 💡 **存储建议：** 轻量服务器磁盘有限，定期 `docker image prune -a` 清理无用镜像。
 
-3. 安装完成后终端会打印配置摘要和管理命令：
+---
 
-   ```
-   ✅ Docker + Compose 安装完成！
-   📋 安装摘要
-   🛠 常用管理命令
-   ```
+<a name="step-3"></a>
+## ③ 代理搭建
 
-> 💡 **存储建议：** 轻量应用服务器磁盘空间有限，建议定期清理无用镜像：`docker image prune -a`
+提供 **Xray-core** 和 **Sing-box** 两种内核，均使用 **VLESS + REALITY + Vision Flow** 协议。客户端通用（v2rayN / Clash Meta / Nekoray 均可导入）。
 
-<a name="docker-代理"></a>
-### 代理搭建 (Docker 版)
+### 方式一：原生安装（裸机运行，性能最佳）
 
-Docker 版代理脚本与 [原生安装](#proxy) 配置参数完全一致，区别只在于以容器方式运行：
+| 脚本 | 内核 | 协议 | 特点 |
+|------|------|------|------|
+| [install-xray-reality.sh](proxy/install-xray-reality.sh) | Xray-core | VLESS + REALITY + Vision | REALITY 协议发明者，成熟稳定 |
+| [install-singbox-reality.sh](proxy/install-singbox-reality.sh) | Sing-box | VLESS + REALITY + Vision | 内核精简，自带 DNS over TLS，支持 TUN |
+
+```bash
+# Xray 版
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/proxy/install-xray-reality.sh)"
+
+# Sing-box 版
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/proxy/install-singbox-reality.sh)"
+```
+
+### 方式二：Docker 容器运行（隔离管理，升级卸载更干净）
+
+| 脚本 | 内核 | 特点 |
+|------|------|------|
+| [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray-core (Docker) | `--network host` 性能无损耗 |
+| [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box (Docker) | 自带 DNS over TLS |
+
+```bash
+# Xray Docker 版
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-xray-reality.sh)"
+
+# Sing-box Docker 版
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-singbox-reality.sh)"
+```
+
+### 原生 vs Docker 对比
 
 | 对比项 | 原生安装 | Docker 版 |
 |--------|----------|-----------|
 | 安装方式 | 下载二进制 + systemd 服务 | 拉取镜像 + Docker 容器 |
 | 卸载 | 删文件 + 删服务 | `docker rm -f` 一行搞定 |
-| 升级 | 重跑安装脚本 | `docker pull` + 重启 |
-| 性能 | 裸机 | `--network host` 无损耗 |
+| 升级 | 重跑安装脚本 | `docker pull` + 重启容器 |
+| 性能 | 裸机 | `--network host` 与裸机一致 |
+| 前置依赖 | 无 | 需先安装 Docker |
 
-**Xray Docker 版：**
+### 运行说明
 
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-xray-reality.sh)"
+每个脚本交互式运行，提示三个参数（直接回车使用默认值）：
+
+```
+请输入端口号 (默认 443):              ← 回车
+请输入回落目标域名 (默认 www.microsoft.com):  ← 回车
+是否开启 BBR? (y/n, 默认 y):         ← 回车
 ```
 
-**Sing-box Docker 版：**
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-singbox-reality.sh)"
-```
-
----
-
-<a name="quickstart"></a>
-## 🚀 快速开始
-
-### 一键运行
-
-无需下载，`curl` 直连 GitHub raw 执行：
-
-**Xray 版：**
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/proxy/install-xray-reality.sh)"
-```
-
-**Sing-box 版：**
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/proxy/install-singbox-reality.sh)"
-```
-
-> 也提供 [Docker 版](#docker-代理)，容器隔离运行，升级卸载更干净。
-
-### 运行流程
-
-1. 执行后会提示输入三个参数（都有默认值，直接回车即可）：
-
-   ```
-   请输入端口号 (默认 443):          ← 回车
-   请输入回落目标域名 (默认 www.microsoft.com):   ← 回车
-   是否开启 BBR? (y/n, 默认 y):     ← 回车
-   ```
-
-2. 脚本自动完成：安装依赖 → 开启 BBR → 安装内核 → 生成密钥 → 写入配置 → 启动服务 → 配置防火墙
-
-3. 安装完成后终端会打印服务器信息和客户端配置：
-
-   ```
-   ✅ Xray + REALITY 安装完成！
-   📋 服务器参数
-   🔗 v2rayN 导入链接
-   📝 Clash Meta 配置
-   📤 分享给朋友
-   🛠 常用管理命令
-   ```
+执行流程：安装依赖 → 开启 BBR → 拉取内核 → 生成密钥 → 写入配置 → 启动服务 → 配置防火墙
 
 ### 客户端配置
 
-安装完成后，复制终端输出的 **v2rayN 导入链接**（`vless://...`），在 v2rayN 中：
+脚本运行完成会输出：
 
-1. 打开 v2rayN
-2. `服务器` → `从剪贴板导入`
-3. 右键节点 → `设为活动服务器`
+| 输出内容 | 用途 |
+|----------|------|
+| `vless://...` 分享链接 | v2rayN → 从剪贴板导入 |
+| Clash Meta 配置段 | Clash Verge / OpenClash 使用 |
+| 服务器参数（UUID/PublicKey/ShortId） | 手动配置或分享给朋友 |
 
-**Clash Meta / Clash Verge 用户**：使用终端输出的 Clash 配置段，粘贴到配置文件中即可。
+> 💡 **速度优化：** v2rayN 中右键节点 → 属性 → MUX 多路复用 → 启用，并发数设为 `8`，可减少 TLS 握手次数，网页加载更快。
 
-> 💡 **速度优化建议：** 在 v2rayN 中右键服务器 → 编辑 → MUX 多路复用 → 启用，并发数设为 `8`。多路复用可大幅减少 TLS 握手次数，网页加载更快。
+---
+
+<a name="step-4"></a>
+## ④ 开发环境
+
+在浏览器中写代码，适合无桌面环境的服务器。**需先安装 Docker。**
+
+| 脚本 | 功能 | 特点 |
+|------|------|------|
+| [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server (VS Code) | 浏览器编辑代码，可选 Continue + DeepSeek AI |
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-codeserver-pro.sh)"
+```
+
+### 脚本特点
+
+- **内存感知** — 检测到 < 1GB 内存时自动询问添加 SWAP
+- **容器冲突处理** — 同名容器提示重建
+- **密码自动生成** — 留空则生成 16 位随机密码
+- **Continue 扩展** — 可选安装 AI 编程助手
+- **DeepSeek 集成** — 自动配置 deepseek-chat / deepseek-coder 双模型
+- **就绪等待** — 轮询 `config.yaml` 确保 code-server 初始化完成后再操作
+- **防火墙自动放行** — 支持 ufw + firewalld
+
+### 访问方式
+
+```
+访问地址:  http://<服务器IP>:<端口>     （默认 8443）
+登录密码:  脚本中设定或自动生成
+```
+
+> 🔒 code-server 默认自签 HTTPS 证书，浏览器显示安全警告时点击「高级 → 继续访问」即可。
+
+### Continue + DeepSeek 使用
+
+如果安装时配置了 DeepSeek API Key，打开 code-server 后：
+1. 点击左侧 AI 图标（Continue 插件）
+2. 选择 `DeepSeek Chat` 开始对话
+3. 编辑代码时 `DeepSeek Coder` 自动补全
+
+---
+
+<a name="step-5"></a>
+## ⑤ Web 服务
+
+部署 Nginx 作为回落站点、静态网站或反向代理。**需先安装 Docker。**
+
+| 脚本 | 功能 | 特点 |
+|------|------|------|
+| [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx 容器部署 | 回落站点 / 静态网站 / 反向代理 / 自定义配置 |
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-nginx.sh)"
+```
+
+### 功能特性
+
+- **自定义网站目录** — 挂载宿主机目录到 Nginx 的 `/usr/share/nginx/html`
+- **示例页面生成** — 自动生成一个美观的回落站点页面
+- **自定义配置** — 支持挂载 `nginx.conf`
+- **多端口映射** — 支持同时映射多个宿主机端口
+
+---
+
+<a name="reference"></a>
+## 📖 脚本一览
+
+所有脚本快速索引：
+
+| 步骤 | 脚本 | 一句话用途 |
+|------|------|------------|
+| ② | [install-docker.sh](docker/install-docker.sh) | 安装 Docker + Compose |
+| ③ (原生) | [install-xray-reality.sh](proxy/install-xray-reality.sh) | Xray + REALITY 原生安装 |
+| ③ (原生) | [install-singbox-reality.sh](proxy/install-singbox-reality.sh) | Sing-box + REALITY 原生安装 |
+| ③ (Docker) | [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray + REALITY Docker 部署 |
+| ③ (Docker) | [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box + REALITY Docker 部署 |
+| ④ | [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server (VS Code 网页版) |
+| ⑤ | [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx 容器（回落/静态/反向代理） |
 
 ---
 
 <a name="share"></a>
 ## 📤 分享给朋友
 
-安装脚本运行结束后，会输出以下格式的完整配置块，**直接复制发送**给你的朋友：
+代理脚本运行结束后，终端会输出完整的配置信息，**直接复制发送**即可：
 
 ```
 服务器信息：
@@ -194,9 +252,9 @@ Clash Meta 配置：
     ...
 ```
 
-对方在 v2rayN 中`从剪贴板导入`即可使用。
+对方在 v2rayN 中 `服务器 → 从剪贴板导入` 即可使用。
 
-> ⚠️ 每个脚本运行时会自动生成唯一的 UUID、密钥对和 ShortId，所以每台服务器的配置都是独立的。
+> ⚠️ 每台服务器运行脚本会生成唯一 UUID、密钥对和 ShortId，配置独立不重复。
 
 ---
 
@@ -204,58 +262,52 @@ Clash Meta 配置：
 
 ```
 vps-scripts/
-├── .gitignore              ← Git 忽略规则
-├── README.md               ← 本文件
-├── proxy/                  ← 代理搭建
+├── README.md                 ← 本文件（使用引导 + 配置说明）
+├── proxy/                    ← 代理搭建（原生安装）
 │   ├── install-xray-reality.sh
 │   └── install-singbox-reality.sh
-├── system/                 ← 系统优化（开发中）
-├── docker/                 ← Docker 安装 & 容器化部署
-│   ├── install-docker.sh
-│   ├── deploy-nginx.sh
-│   ├── install-xray-reality.sh
-│   └── install-singbox-reality.sh
+├── docker/                   ← Docker 环境 + 容器化服务
+│   ├── install-docker.sh           Docker 引擎安装
+│   ├── deploy-nginx.sh             Nginx 容器
+│   ├── deploy-codeserver-pro.sh        code-server 容器
+│   ├── install-xray-reality.sh     Xray 容器
+│   └── install-singbox-reality.sh  Sing-box 容器
+└── system/                   ← 系统优化（开发中）
 ```
 
 ---
 
-## ⚙️ 管理命令
-
-安装后常用操作：
-
-### 代理
-
-```bash
-# 查看运行状态
-systemctl status xray        # Xray
-systemctl status sing-box    # Sing-box
-
-# 查看日志
-journalctl -u xray --no-pager -l -n 30
-journalctl -u sing-box --no-pager -l -n 30
-
-# 重启
-systemctl restart xray
-systemctl restart sing-box
-```
+## 🔧 常用管理命令
 
 ### Docker
 
 ```bash
-# 查看运行状态
+# 服务状态
 systemctl status docker
-
-# 查看日志
 journalctl -u docker --no-pager -l -n 30
 
-# 重启
-systemctl restart docker
+# 容器管理
+docker ps                            # 运行中容器
+docker ps -a                         # 所有容器
+docker logs -f <容器名>              # 实时日志
+docker restart <容器名>              # 重启
+docker rm -f <容器名>                # 强制删除
+docker images                        # 镜像列表
+docker image prune -a                # 清理无用镜像
+```
 
-# 查看运行容器
-docker ps
+### 代理（原生安装）
 
-# 清理无用镜像
-docker image prune -a
+```bash
+# Xray
+systemctl status xray
+journalctl -u xray --no-pager -l -n 30
+systemctl restart xray
+
+# Sing-box
+systemctl status sing-box
+journalctl -u sing-box --no-pager -l -n 30
+systemctl restart sing-box
 ```
 
 ---
@@ -263,12 +315,12 @@ docker image prune -a
 <a name="contributing"></a>
 ## 🤝 贡献
 
-欢迎提交 PR 或开 Issue 补充更多服务器脚本，比如：
+欢迎提交 PR 或开 Issue 补充更多脚本，比如：
 
-- 系统初始化（时区、SSH 加固、Fail2Ban）
+- 系统初始化（时区、SSH 加固、Fail2Ban、SWAP 配置）
 - Node.js / Python 环境部署
-- 网络加速（BBR、BBRx）
-- WireGuard VPN
+- 网络加速（BBR / BBRx / WireGuard）
+- Docker 应用（MySQL、Redis、PostgreSQL 容器化）
 
 ---
 
