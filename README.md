@@ -234,6 +234,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 | ③ (Docker) | [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray + REALITY Docker 部署 |
 | ③ (Docker) | [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box + REALITY Docker 部署 |
 | ④ | [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server (VS Code 网页版) |
+| ④ | [install-claude-code.sh](docker/install-claude-code.sh) | 容器内安装 Claude Code + DeepSeek |
 | ⑤ | [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx 容器（回落/静态/反向代理） |
 
 ---
@@ -280,6 +281,7 @@ vps-scripts/
 │   ├── install-docker.sh           Docker 引擎安装
 │   ├── deploy-nginx.sh             Nginx 容器
 │   ├── deploy-codeserver-pro.sh        code-server 容器
+│   ├── install-claude-code.sh          Claude Code + DeepSeek 安装
 │   ├── install-xray-reality.sh     Xray 容器
 │   └── install-singbox-reality.sh  Sing-box 容器
 └── system/                   ← 系统优化
