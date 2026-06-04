@@ -9,7 +9,6 @@ set -e
 #   - 可选 BBR、SWAP、防火墙
 #   - 自定义 HTTP 端口 或 自动 HTTPS（Caddy+Let's Encrypt）
 #   - 内置 Continue + DeepSeek/Claude 双模型配置
-#   - 可选安装 Claude Code CLI
 #   - 配置、项目、Continue 数据完全持久化
 #============================================================
 
@@ -220,10 +219,6 @@ collect_config() {
         echo
     fi
 
-    # Claude Code CLI
-    read -p "是否安装 Claude Code CLI? [y/N]: " INSTALL_CLAUDE_CLI
-    INSTALL_CLAUDE_CLI=$(echo "$INSTALL_CLAUDE_CLI" | tr '[:upper:]' '[:lower:]')
-    INSTALL_CLAUDE_CLI=${INSTALL_CLAUDE_CLI:-n}
 }
 
 #--------------------- 5. 容器冲突检查 ---------------------#
@@ -381,11 +376,6 @@ install_extensions() {
         info "安装 Continue 扩展..."
         $SUDO docker exec -u coder "$CONTAINER_NAME" code-server --install-extension Continue.continue --force || warn "Continue 安装失败"
     fi
-
-    if [[ "$INSTALL_CLAUDE_CLI" == "y" ]]; then
-        info "安装 Claude Code CLI..."
-        $SUDO docker exec -u root "$CONTAINER_NAME" npm install -g @anthropic-ai/claude-code || warn "Claude Code CLI 安装失败"
-    fi
 }
 
 #--------------------- 11. Continue 模型配置（python3） ---------------------#
@@ -475,9 +465,6 @@ show_result() {
         echo "Continue:  已安装"
         [ -n "$DEEPSEEK_KEY" ] && echo "DeepSeek:  已配置 (Chat & Coder)"
         [ -n "$ANTHROPIC_KEY" ] && echo "Claude:    Claude 3.5 Sonnet"
-    fi
-    if [[ "$INSTALL_CLAUDE_CLI" == "y" ]]; then
-        echo "Claude CLI: 已安装 (容器终端输入 claude)"
     fi
     echo ""
     highlight "常用管理命令:"

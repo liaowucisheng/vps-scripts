@@ -27,23 +27,32 @@
 <a name="step-1"></a>
 ## ① 系统初始化
 
-初次上手的必备操作：更新系统 + 开启 BBR + 安装基础工具。
+初次上手的必备操作：换源加速 + 更新系统 + BBR + 基础工具 + 时区/SWAP/SSH 等。
 
-暂未提供独立脚本（开发中），可手动执行：
+| 脚本 | 功能 | 特点 |
+|------|------|------|
+| [init.sh](system/init.sh) | 系统一键初始化 | 换源、更新、BBR、SWAP、时区、主机名、SSH 端口、防火墙 |
+
+### 一键运行
 
 ```bash
-apt update -y && apt upgrade -y
-apt install curl wget openssl -y
-
-# 开启 BBR
-modprobe tcp_bbr
-echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
-echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
-sysctl -p
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/system/init.sh)"
 ```
 
-> 💡 后续的 **install-docker.sh** 和代理脚本都会自动安装 curl/openssl 并启用 BBR，跳过本步不影响。
+### 脚本特点
+
+- **云厂商自动感知** — 阿里云/腾讯云/华为云默认推荐换源并给出对应镜像源菜单
+- **APT 换源** — 支持 5 种国内镜像源 + 自定义，备份原 sources.list
+- **系统更新** — 一键 apt update && apt upgrade
+- **基础工具** — 安装 curl/wget/openssl/git/vim
+- **BBR 加速** — 可选开启 TCP BBR 拥塞控制
+- **时区设置** — 默认 Asia/Shanghai
+- **SWAP 配置** — 内存 < 2GB 时自动提示添加（按内存大小智能分配）
+- **主机名修改** — 可选修改主机名并写入 /etc/hosts
+- **SSH 端口修改** — 可选修改端口并自动放行防火墙
+- **UFW 防火墙** — 可选启用并放行 SSH 端口
+
+> 💡 后续的 **install-docker.sh** 和代理脚本也会自动启用 BBR，跳过本步不影响。
 
 ---
 
@@ -218,6 +227,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 
 | 步骤 | 脚本 | 一句话用途 |
 |------|------|------------|
+| ① | [init.sh](system/init.sh) | 系统初始化（换源/更新/BBR/时区/SWAP） |
 | ② | [install-docker.sh](docker/install-docker.sh) | 安装 Docker + Compose |
 | ③ (原生) | [install-xray-reality.sh](proxy/install-xray-reality.sh) | Xray + REALITY 原生安装 |
 | ③ (原生) | [install-singbox-reality.sh](proxy/install-singbox-reality.sh) | Sing-box + REALITY 原生安装 |
@@ -272,7 +282,8 @@ vps-scripts/
 │   ├── deploy-codeserver-pro.sh        code-server 容器
 │   ├── install-xray-reality.sh     Xray 容器
 │   └── install-singbox-reality.sh  Sing-box 容器
-└── system/                   ← 系统优化（开发中）
+└── system/                   ← 系统优化
+    └── init.sh                     系统一键初始化
 ```
 
 ---
