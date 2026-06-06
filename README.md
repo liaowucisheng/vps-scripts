@@ -162,39 +162,88 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 
 在浏览器中写代码，适合无桌面环境的服务器。**需先安装 Docker。**
 
-| 脚本 | 功能 | 特点 |
+提供两个版本：**Flash** 轻量够用，**Pro** 支持 Caddy 自动 HTTPS + Continue + Claude Code。
+
+| 脚本 | 版本 | 功能 |
 |------|------|------|
-| [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server (VS Code) | 浏览器编辑代码，可选 Continue + DeepSeek AI |
+| [deploy-codeserver-flash.sh](docker/deploy-codeserver-flash.sh) | Flash | 基础部署，可选 Continue + DeepSeek |
+| [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | Pro | Caddy HTTPS + Continue + DeepSeek/Claude 双模型 |
+
+### Flash 版 — 轻量快速
+
+适合个人使用，部署简单，资源占用少。
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-codeserver-flash.sh)"
+```
+
+**特点：** 云厂商感知、内存检测（< 1GB 建议加 SWAP）、容器冲突处理、密码自动生成、可选 Continue + DeepSeek（deepseek-chat / deepseek-coder）、防火墙自动放行。
+
+### Pro 版 — 完整功能
+
+适合需要域名 + HTTPS 的生产环境，内置 Caddy 自动申请 Let's Encrypt 证书。
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/deploy-codeserver-pro.sh)"
 ```
 
-### 脚本特点
-
+**特点：**
+- **自动 HTTPS** — 绑定域名后 Caddy 自动申请 Let's Encrypt 证书，无需手动管理
+- **双模式** — 支持 HTTP（仅端口）或 HTTPS（需域名）两种部署方式
+- **Continue + DeepSeek/Claude 双模型** — 自动配置 Continue 扩展，支持 DeepSeek 和 Claude 两个 AI 模型
+- **Claude Code CLI** — 可选在容器内安装 Claude Code 命令行工具
 - **内存感知** — 检测到 < 1GB 内存时自动询问添加 SWAP
+- **BBR 可选** — 可选开启 TCP BBR 拥塞控制
 - **容器冲突处理** — 同名容器提示重建
 - **密码自动生成** — 留空则生成 16 位随机密码
-- **Continue 扩展** — 可选安装 AI 编程助手
-- **DeepSeek 集成** — 自动配置 deepseek-chat / deepseek-coder 双模型
 - **就绪等待** — 轮询 `config.yaml` 确保 code-server 初始化完成后再操作
 - **防火墙自动放行** — 支持 ufw + firewalld
 
 ### 访问方式
 
 ```
-访问地址:  http://<服务器IP>:<端口>     （默认 8443）
+Flash:  http://<服务器IP>:<端口>            （默认 8443，自签证书）
+Pro:    https://<你的域名>                   （Caddy 自动 HTTPS）
 登录密码:  脚本中设定或自动生成
 ```
 
-> 🔒 code-server 默认自签 HTTPS 证书，浏览器显示安全警告时点击「高级 → 继续访问」即可。
+> 🔒 Flash 版使用 code-server 自签 HTTPS 证书，浏览器显示安全警告时点击「高级 → 继续访问」即可。Pro 版绑定域名后为正规 CA 证书。
 
 ### Continue + DeepSeek 使用
 
 如果安装时配置了 DeepSeek API Key，打开 code-server 后：
 1. 点击左侧 AI 图标（Continue 插件）
-2. 选择 `DeepSeek Chat` 开始对话
+2. Flash 版选择 `DeepSeek Chat` / `DeepSeek Coder`；Pro 版额外支持 `Claude` 模型
 3. 编辑代码时 `DeepSeek Coder` 自动补全
+
+### 安装 Claude Code CLI（容器内）
+
+已部署 code-server 后，可运行此脚本在容器内安装 Claude Code CLI，通过 DeepSeek Anthropic 兼容 API 使用：
+
+| 脚本 | 功能 |
+|------|------|
+| [install-claude-code.sh](docker/install-claude-code.sh) | 容器内安装 Claude Code + DeepSeek |
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-scripts/main/docker/install-claude-code.sh)"
+```
+
+**特点：**
+- **自动检测容器** — 自动发现运行中的 code-server 容器
+- **Node.js 安装** — 容器内缺少 Node.js 时自动安装
+- **Claude Code CLI** — 通过 npm 安装 `@anthropic-ai/claude-code`
+- **DeepSeek 兼容 API** — 自动配置 `ANTHROPIC_BASE_URL` 指向 DeepSeek
+- **多模型支持** — 默认 `deepseek-v4-pro`，可切换 `deepseek-v4-flash`
+- **双配置写入** — 同时写入 `settings.json` 和 `.bashrc`，确保终端和 code-server 内均可使用
+
+使用方式：
+```bash
+# 进入容器直接运行
+docker exec -it -u coder <容器名> claude
+
+# 更新 Claude Code
+docker exec -u root <容器名> npm update -g @anthropic-ai/claude-code
+```
 
 ---
 
@@ -233,7 +282,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/liaowucisheng/vps-script
 | ③ (原生) | [install-singbox-reality.sh](proxy/install-singbox-reality.sh) | Sing-box + REALITY 原生安装 |
 | ③ (Docker) | [install-xray-reality.sh](docker/install-xray-reality.sh) | Xray + REALITY Docker 部署 |
 | ③ (Docker) | [install-singbox-reality.sh](docker/install-singbox-reality.sh) | Sing-box + REALITY Docker 部署 |
-| ④ | [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server (VS Code 网页版) |
+| ④ | [deploy-codeserver-flash.sh](docker/deploy-codeserver-flash.sh) | code-server 轻量部署（Docker） |
+| ④ | [deploy-codeserver-pro.sh](docker/deploy-codeserver-pro.sh) | code-server 完整部署（Caddy HTTPS） |
 | ④ | [install-claude-code.sh](docker/install-claude-code.sh) | 容器内安装 Claude Code + DeepSeek |
 | ⑤ | [deploy-nginx.sh](docker/deploy-nginx.sh) | Nginx 容器（回落/静态/反向代理） |
 
@@ -280,7 +330,8 @@ vps-scripts/
 ├── docker/                   ← Docker 环境 + 容器化服务
 │   ├── install-docker.sh           Docker 引擎安装
 │   ├── deploy-nginx.sh             Nginx 容器
-│   ├── deploy-codeserver-pro.sh        code-server 容器
+│   ├── deploy-codeserver-flash.sh      code-server 容器（轻量版）
+│   ├── deploy-codeserver-pro.sh        code-server 容器（完整版）
 │   ├── install-claude-code.sh          Claude Code + DeepSeek 安装
 │   ├── install-xray-reality.sh     Xray 容器
 │   └── install-singbox-reality.sh  Sing-box 容器
