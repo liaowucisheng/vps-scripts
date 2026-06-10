@@ -14,6 +14,19 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# ============================================================
+# Root 权限检查
+# ============================================================
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}[ERR] 此脚本需要 root 权限运行！${NC}"
+    echo -e "${YELLOW}请使用 sudo 或以 root 用户执行:${NC}"
+    echo -e "  ${BLUE}sudo bash $0${NC}"
+    echo ""
+    echo -e "${YELLOW}或者切换到 root 用户:${NC}"
+    echo -e "  ${BLUE}sudo -i${NC}"
+    exit 1
+fi
+
 info()      { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()      { echo -e "${YELLOW}[WARN]${NC} $1"; }
 err()       { echo -e "${RED}[ERR]${NC} $1"; }
@@ -262,6 +275,14 @@ curl -fsSL --max-time 30 https://get.docker.com -o /tmp/get-docker.sh || {
     err "下载 Docker 安装脚本失败，请检查网络连接"
     exit 1
 }
+
+# 国内云服务器: 将 download.docker.com 替换为阿里云镜像
+if is_china_cloud "$CLOUD_PROVIDER"; then
+    info "检测到国内云厂商，使用阿里云 Docker CE 镜像加速下载..."
+    sed -i 's|https://download.docker.com|https://mirrors.aliyun.com/docker-ce|g' /tmp/get-docker.sh
+    ok "已将 download.docker.com 替换为 mirrors.aliyun.com/docker-ce"
+fi
+
 sh /tmp/get-docker.sh
 rm -f /tmp/get-docker.sh
 
