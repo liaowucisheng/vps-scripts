@@ -154,28 +154,20 @@ if [[ "$ENABLE_MIRROR" == "y" ]]; then
     echo ""
     echo "选择镜像源:"
 
-    # 根据云厂商调整推荐顺序
+    # 国内云默认推荐中科大镜像（公共、免登录）
     case "$CLOUD_PROVIDER" in
-        aliyun)
-            echo "  1) 阿里云容器镜像服务加速器 (推荐，需登录 cr.console.aliyun.com 获取专属地址)"
+        aliyun|tencent|huawei)
+            echo "  1) 中科大镜像 (https://docker.mirrors.ustc.edu.cn) [推荐]"
             echo "  2) Docker Proxy 镜像 (https://dockerproxy.com)"
-            echo "  3) 中科大镜像 (https://docker.mirrors.ustc.edu.cn)"
-            echo "  4) 自定义"
-            read -p "请输入选项 (1-4, 默认 1): " MIRROR_CHOICE
-            MIRROR_CHOICE=${MIRROR_CHOICE:-1}
-            ;;
-        tencent)
-            echo "  1) 腾讯云容器镜像服务加速器 (推荐，需登录 console.cloud.tencent.com/tcr 获取)"
-            echo "  2) Docker Proxy 镜像 (https://dockerproxy.com)"
-            echo "  3) 中科大镜像 (https://docker.mirrors.ustc.edu.cn)"
+            echo "  3) 阿里云加速器 (需登录 cr.console.aliyun.com 获取专属地址)"
             echo "  4) 自定义"
             read -p "请输入选项 (1-4, 默认 1): " MIRROR_CHOICE
             MIRROR_CHOICE=${MIRROR_CHOICE:-1}
             ;;
         *)
-            echo "  1) 阿里云加速器 (需登录 cr.console.aliyun.com 获取专属地址)"
+            echo "  1) 中科大镜像 (https://docker.mirrors.ustc.edu.cn) [推荐]"
             echo "  2) Docker Proxy 镜像 (https://dockerproxy.com)"
-            echo "  3) 中科大镜像 (https://docker.mirrors.ustc.edu.cn)"
+            echo "  3) 阿里云加速器 (需登录 cr.console.aliyun.com 获取专属地址)"
             echo "  4) 自定义"
             read -p "请输入选项 (1-4, 默认 2): " MIRROR_CHOICE
             MIRROR_CHOICE=${MIRROR_CHOICE:-2}
@@ -184,19 +176,13 @@ if [[ "$ENABLE_MIRROR" == "y" ]]; then
 
     case "$MIRROR_CHOICE" in
         1)
-            if [[ "$CLOUD_PROVIDER" == "aliyun" ]]; then
-                read -p "请输入阿里云加速器地址 (如 https://xxxxx.mirror.aliyuncs.com): " DOCKER_MIRROR
-            elif [[ "$CLOUD_PROVIDER" == "tencent" ]]; then
-                read -p "请输入腾讯云加速器地址: " DOCKER_MIRROR
-            else
-                read -p "请输入加速器地址: " DOCKER_MIRROR
-            fi
+            DOCKER_MIRROR="https://docker.mirrors.ustc.edu.cn"
             ;;
         2)
             DOCKER_MIRROR="https://dockerproxy.com"
             ;;
         3)
-            DOCKER_MIRROR="https://docker.mirrors.ustc.edu.cn"
+            read -p "请输入阿里云加速器地址 (如 https://xxxxx.mirror.aliyuncs.com): " DOCKER_MIRROR
             ;;
         4)
             read -p "请输入镜像加速地址: " DOCKER_MIRROR
@@ -221,7 +207,7 @@ NON_ROOT=${NON_ROOT:-y}
 # ============================================================
 info "更新系统..."
 if command -v apt &>/dev/null; then
-    apt update -y && apt upgrade -y
+    apt update -y
     apt install curl wget -y
 elif command -v yum &>/dev/null; then
     yum update -y
@@ -241,11 +227,15 @@ if [[ "$ENABLE_BBR" == "y" ]]; then
     info "开启 BBR 拥塞控制..."
     modprobe tcp_bbr 2>/dev/null || true
     mkdir -p /etc/modules-load.d
-    grep -q "tcp_bbr" /etc/modules-load.d/modules.conf 2>/dev/null || echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
-    cat >> /etc/sysctl.conf <<EOF
+    if ! grep -q "^tcp_bbr" /etc/modules-load.d/modules.conf 2>/dev/null; then
+        echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
+    fi
+    if ! grep -q "^net.core.default_qdisc" /etc/sysctl.conf 2>/dev/null; then
+        cat >> /etc/sysctl.conf <<EOF
 net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 EOF
+    fi
     sysctl -p >/dev/null 2>&1
     if lsmod | grep -q bbr; then
         ok "BBR 已开启"
@@ -270,27 +260,89 @@ fi
 # ============================================================
 # 4. 安装 Docker
 # ============================================================
-info "安装 Docker (官方脚本)..."
-curl -fsSL --max-time 30 https://get.docker.com -o /tmp/get-docker.sh || {
-    err "下载 Docker 安装脚本失败，请检查网络连接"
-    exit 1
+install_docker_from_aliyun_mirror() {
+    info "使用阿里云 Docker CE 镜像安装..."
+
+    if command -v apt &>/dev/null; then
+        # ----- apt 系 (Ubuntu/Debian) -----
+        local distro=""
+        local codename=""
+
+        # 从 /etc/os-release 读取发行版和版本代号（兼容 Ubuntu 和 Debian，无需 lsb_release）
+        distro=$(grep -oP '(?<=^ID=).*' /etc/os-release 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo "ubuntu")
+        codename=$(grep -oP '(?<=^VERSION_CODENAME=).*' /etc/os-release 2>/dev/null || echo "jammy")
+
+        # 安装依赖
+        apt install -y ca-certificates curl gnupg
+
+        # 添加 Docker 官方 GPG 密钥（从阿里云镜像下载）
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL --max-time 30 "https://mirrors.aliyun.com/docker-ce/linux/${distro}/gpg" \
+            | gpg --batch --dearmor -o /etc/apt/keyrings/docker.gpg || {
+            err "GPG 密钥下载失败，请检查网络连接"
+            return 1
+        }
+        chmod a+r /etc/apt/keyrings/docker.gpg
+
+        # 添加阿里云 Docker CE 仓库
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/${distro} ${codename} stable" \
+            | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+        apt update -y
+        apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras
+
+    elif command -v dnf &>/dev/null; then
+        # ----- dnf 系 (Fedora/RHEL 8+/Rocky/Alma) -----
+        dnf install -y dnf-plugins-core
+        dnf config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        sed -i 's|https://download.docker.com|https://mirrors.aliyun.com/docker-ce|g' /etc/yum.repos.d/docker-ce.repo 2>/dev/null || true
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    elif command -v yum &>/dev/null; then
+        # ----- yum 系 (CentOS 7) -----
+        yum install -y yum-utils
+        yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        sed -i 's|https://download.docker.com|https://mirrors.aliyun.com/docker-ce|g' /etc/yum.repos.d/docker-ce.repo 2>/dev/null || true
+        yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+        err "不支持的包管理器！国内镜像安装仅支持 apt/yum/dnf"
+        return 1
+    fi
+
+    # 验证 Docker 安装
+    if command -v docker &>/dev/null; then
+        ok "Docker 安装成功: $(docker --version)"
+        return 0
+    else
+        err "Docker 安装失败！"
+        return 1
+    fi
 }
 
-# 国内云服务器: 将 download.docker.com 替换为阿里云镜像
+info "安装 Docker..."
+
 if is_china_cloud "$CLOUD_PROVIDER"; then
-    info "检测到国内云厂商，使用阿里云 Docker CE 镜像加速下载..."
-    sed -i 's|https://download.docker.com|https://mirrors.aliyun.com/docker-ce|g' /tmp/get-docker.sh
-    ok "已将 download.docker.com 替换为 mirrors.aliyun.com/docker-ce"
-fi
-
-sh /tmp/get-docker.sh
-rm -f /tmp/get-docker.sh
-
-if command -v docker &>/dev/null; then
-    ok "Docker 安装成功: $(docker --version)"
+    # 国内云: 通过阿里云镜像安装，绕过 get.docker.com
+    install_docker_from_aliyun_mirror || {
+        err "国内镜像安装失败！"
+        exit 1
+    }
 else
-    err "Docker 安装失败！"
-    exit 1
+    # 海外: 使用官方脚本
+    info "使用官方脚本安装 Docker..."
+    curl -fsSL --max-time 30 https://get.docker.com -o /tmp/get-docker.sh || {
+        err "下载 Docker 安装脚本失败，请检查网络连接"
+        exit 1
+    }
+    sh /tmp/get-docker.sh
+    rm -f /tmp/get-docker.sh
+
+    if command -v docker &>/dev/null; then
+        ok "Docker 安装成功: $(docker --version)"
+    else
+        err "Docker 安装失败！"
+        exit 1
+    fi
 fi
 
 # ============================================================
